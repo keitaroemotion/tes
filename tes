@@ -17,20 +17,11 @@ def kill_processes(root_dir)
   end
 end
 
-def get_log_location
-  "log/result.log"
-end
-
-def execute_shell(command, delay = 0, log = get_log_location)
+def execute_shell(command, delay = 0)
   puts delay == 0 ? "" : "sleep #{delay}..."
-  system "sleep #{delay}"
-  puts "\n[executing..]#{command.red} >> #{log.green}\n"
-  system "#{command} "
-  puts "\n[done!]#{command}\n".green
+  puts "[>>] #{command.green} "
+  system "#{command}"
 end
-
-# renew logfile
-execute_shell "rm #{get_log_location};"
 
 def setter_array(root_dir)
   kill_processes root_dir
@@ -49,11 +40,43 @@ def setter_array(root_dir)
   ]
 end
 
-def unit_test()
+def unit_test
   [["bundle exec ruby -I test #{ARGV[0]} #{ARGV[1]} #{ARGV[2]}", 0]]
 end
 
+
+def quick_tests
+#  print "[denom: ]".green
+#  denom = $stdin.gets.chomp
+  denom = 2 
+
+  test_files = Dir.glob("test/**/*").select do |file|
+    File.directory?(file) 
+  end
+  .select do |dir|
+    Dir["#{dir}/*"].select do |file|
+      file.end_with?("_test.rb")
+    end.size > 0
+  end
+
+  if test_files.size/denom.to_i < 1
+    puts "[denominator is wrong]".red
+    abort
+  end
+
+  test_files.each_slice(test_files.size/denom.to_i).to_a
+    .map { |clan|
+      [
+        clan.inject("") do |acc, test_class|
+          acc + "bundle exec ruby -I test #{test_class}/*_test.rb ;"
+        end,
+        0
+      ]  
+    }
+end
+
 def get_test_plan(option, root_dir)
+  return quick_tests if option == "quick"
   return [["#{root_dir}/bin/rake test:all ", 0]] if option == "all"
   return setter_array(root_dir) if option == "set"
   return unit_test if /^(all|set)$/.match(option).nil?
@@ -63,11 +86,32 @@ root_dir = "."
 # calling shell scripts simultaneously.
 # the integer value of each array element is start time delay
 # (for these commands have execution orders)
+
+option = ARGV[0]
+start = Time.now
+
 Thread.new do
-  get_test_plan(ARGV[0], root_dir).each do |order|
-    # [0] command [1] start delay time
-    execute_shell order[0], order[1]
+  plans = get_test_plan(option, root_dir)
+  max =  plans.flatten.size
+  if option == "quick"
+    print "["
+    (0...plans.size).each do |x|
+      print "#{x}, "
+    end
+    print "] "
+    input = $stdin.gets.chomp
+    if !(0...plans.size).map{ |x| x.to_s }.include?(input)
+      puts "[input wrong!]".magenta
+      abort
+    end
+    print "plans size: #{plans.flatten.size} ".green
+    plans = [plans[input.to_i]]
+    puts " >> #{plans.flatten.size}".cyan
   end
+  plans.each do |order|
+    execute_shell order[0], order[1]
+  end  
 end.join
 
 system "afplay /System/Library/Sounds/Ping.aiff"
+puts "[Time Spent >>]".cyan + " #{Time.now - start} sec"
