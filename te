@@ -1,0 +1,72 @@
+#!/usr/bin/env ruby
+
+require "colorize"
+
+ARGV.empty? && abort("you need argument [all][set][path]")
+
+def killers
+  [
+#    "postgres",
+    "redis-server",
+    "elasticsearch",
+    "rake",
+    "rails",
+    "bundle",
+    "bin/rails",
+  ].map do |x|
+    `ps aux | grep #{x}`.split("\n").select do |line|
+      !line.include?("grep")    
+    end.map do |line|
+      "sudo kill #{line.split(" ")[1]}"
+    end
+  end.flatten
+end
+
+def setters
+  cmds = [
+    ["cp config/database.yml.sample config/database.yml", 0],
+    ["elasticsearch", 3],
+    ["pg -ctl /usr/local/var/postgres/postmaster.pid",1],
+    ["postgres -D /usr/local/var/postgres", 0],
+    ["createdb", 1],
+    ["redis-server /usr/local/etc/redis.conf", 12],
+    ["bin/rake db:drop db:create db:migrate db:schema:load", 2],
+    ["bin/rails s -p4500", 5],
+    ["bin/rake db:seed --trace", 5],
+    ["bin/rake db:migrate", 10],
+    ["bin/rake elasticsearch:import:bulk", 5]
+  ]
+  
+  {
+    commands: cmds.map { |x, y| "#{x} &" },
+    lags:     cmds.map { |x, y| y }
+  }  
+end
+
+option = ARGV[0]
+start = Time.now
+
+def execute(cmds, lags=[])
+  cmds.each_with_index do |cmd, i|
+    puts cmd.green
+    system "#{cmd}"
+    (0...lags[i]).each do |time|
+      print "wait: #{time+1}/#{lags[i].to_s.green} \r"
+      sleep time 
+    end if lags.size > 0
+  end
+end  
+
+def alert_fin
+  system "afplay /System/Library/Sounds/Ping.aiff"
+  puts "[Time Spent >>]".cyan + " #{Time.now - start} sec"
+end  
+
+case option 
+when "set"
+  system "bundle install"
+  execute killers
+  execute setters[:commands], setters[:lags] 
+when "kill"  
+  execute killers
+end  
