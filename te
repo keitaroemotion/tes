@@ -6,7 +6,7 @@ ARGV.empty? && abort("you need argument [all][set][path]")
 
 def killers
   [
-#    "postgres",
+    "postgres",
     "redis-server",
     "elasticsearch",
     "rake",
@@ -30,7 +30,7 @@ def setters
     ["postgres -D /usr/local/var/postgres", 0],
     ["createdb", 1],
     ["redis-server /usr/local/etc/redis.conf", 12],
-    ["bin/rake db:drop db:create db:migrate db:schema:load", 2],
+    ["bin/rake db:drop db:create db:schema:load", 2],
     ["bin/rails s -p4500", 5],
     ["bin/rake db:seed --trace", 5],
     ["bin/rake db:migrate", 10],
@@ -44,10 +44,9 @@ def setters
 end
 
 option = ARGV[0]
-start = Time.now
 
 def execute(cmds, lags=[])
-  cmds.each_with_index do |cmd, i|
+ cmds.each_with_index do |cmd, i|
     puts cmd.green
     system "#{cmd}"
     (0...lags[i]).each do |time|
@@ -57,14 +56,16 @@ def execute(cmds, lags=[])
   end
 end  
 
-def alert_fin
+def alert_fin(start)
   system "afplay /System/Library/Sounds/Ping.aiff"
   puts "[Time Spent >>]".cyan + " #{Time.now - start} sec"
 end  
 
+start = Time.now
+
 case option 
 when "all"
-  system "bin/rake test all"
+  system "bin/rake test:all"
 when "set"
   system "bundle install"
   execute killers
@@ -73,4 +74,4 @@ when "kill"
   execute killers
 end  
 
-alert_fin
+alert_fin start
