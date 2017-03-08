@@ -63,6 +63,8 @@ def alert_fin
 end  
 
 case option 
+when "all"
+  system "bin/rake test all"
 when "set"
   system "bundle install"
   execute killers
@@ -70,3 +72,5 @@ when "set"
 when "kill"  
   execute killers
 end  
+
+alert_fin
